@@ -316,8 +316,23 @@ func (c *CSIControllerService) ListVolumes(context.Context, *csi.ListVolumesRequ
 }
 
 // GetCapacity is not implemented yet
-func (c *CSIControllerService) GetCapacity(context.Context, *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented yet")
+func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	ll := c.log.WithFields(logrus.Fields{
+		"method":   "GetCapacity",
+	})
+	ll.Infof("Processing request: %v", req)
+
+	//var (
+		//acList []accrd.AvailableCapacity
+		//acReader = capacityplanner.NewACReader(c.k8sclient, c.logrus, true)
+	//)
+
+	//acList, err = c.crHelper.GetACCRs()
+	return &csi.GetCapacityResponse{
+		AvailableCapacity: 0,
+		MaximumVolumeSize: &wrappers.Int64Value{},
+		MinimumVolumeSize: &wrappers.Int64Value{},
+	}, nil
 }
 
 // ControllerGetCapabilities is the implementation of CSI Spec ControllerGetCapabilities.
@@ -343,6 +358,7 @@ func (c *CSIControllerService) ControllerGetCapabilities(context.Context, *csi.C
 	for _, c := range []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+		csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 	} {
 		caps = append(caps, newCap(c))
 	}
