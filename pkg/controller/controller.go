@@ -329,8 +329,10 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 
 	//acList, err = c.crHelper.GetACCRs()
 	return &csi.GetCapacityResponse{
-		AvailableCapacity: int64(util.GBYTE) * 101,
-		MaximumVolumeSize: &wrappers.Int64Value{},
+		AvailableCapacity: int64(util.MBYTE) * 101,
+		MaximumVolumeSize: &wrappers.Int64Value{
+			Value: int64(util.MBYTE) * 101,
+		},
 		MinimumVolumeSize: &wrappers.Int64Value{},
 	}, nil
 }
