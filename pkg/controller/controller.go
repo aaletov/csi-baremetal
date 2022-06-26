@@ -43,6 +43,8 @@ import (
 	"github.com/dell/csi-baremetal/pkg/controller/mountoptions"
 	"github.com/dell/csi-baremetal/pkg/controller/node"
 	csibmnodeconst "github.com/dell/csi-baremetal/pkg/crcontrollers/node/common"
+	acrcrd "github.com/dell/csi-baremetal/api/v1/acreservationcrd"
+	v1 "github.com/dell/csi-baremetal/api/v1"
 )
 
 // NodeID is the type for node hostname
@@ -322,16 +324,35 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 	})
 	ll.Infof("Processing request: %v", req)
 
-	//var (
-		//acList []accrd.AvailableCapacity
-		//acReader = capacityplanner.NewACReader(c.k8sclient, c.logrus, true)
-	//)
+	var (
+		availableCapacity int64
+	)
 
-	//acList, err = c.crHelper.GetACCRs()
+	acrList := &acrcrd.AvailableCapacityReservationList{}
+	
+	if err := c.k8sclient.ReadList(context.Background(), acrList); err != nil {
+		err = fmt.Errorf("unable to read ACR from cluster: %v", err)
+		return nil, err
+	}
+
+	for _, acr := range acrList.Items {
+		if acr.Spec.Status != v1.ReservationConfirmed {
+			return &csi.GetCapacityResponse{
+				AvailableCapacity: 0,
+				MaximumVolumeSize: &wrappers.Int64Value{},
+				MinimumVolumeSize: &wrappers.Int64Value{},
+			}, nil
+		} else {
+			for _, r := range acr.Spec.ReservationRequests {
+				availableCapacity += r.CapacityRequest.Size
+			}
+		}
+	} 
+
 	return &csi.GetCapacityResponse{
-		AvailableCapacity: int64(util.MBYTE) * 101,
+		AvailableCapacity: availableCapacity,
 		MaximumVolumeSize: &wrappers.Int64Value{
-			Value: int64(util.MBYTE) * 101,
+			Value: availableCapacity,
 		},
 		MinimumVolumeSize: &wrappers.Int64Value{},
 	}, nil
