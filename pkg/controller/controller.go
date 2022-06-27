@@ -43,8 +43,7 @@ import (
 	"github.com/dell/csi-baremetal/pkg/controller/mountoptions"
 	"github.com/dell/csi-baremetal/pkg/controller/node"
 	csibmnodeconst "github.com/dell/csi-baremetal/pkg/crcontrollers/node/common"
-	acrcrd "github.com/dell/csi-baremetal/api/v1/acreservationcrd"
-	v1 "github.com/dell/csi-baremetal/api/v1"
+	accrd "github.com/dell/csi-baremetal/api/v1/availablecapacitycrd"
 )
 
 // NodeID is the type for node hostname
@@ -328,24 +327,16 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 		availableCapacity int64
 	)
 
-	acrList := &acrcrd.AvailableCapacityReservationList{}
+	acList := &accrd.AvailableCapacityList{}
 	
-	if err := c.k8sclient.ReadList(context.Background(), acrList); err != nil {
-		err = fmt.Errorf("unable to read ACR from cluster: %v", err)
+	if err := c.k8sclient.ReadList(context.Background(), acList); err != nil {
+		err = fmt.Errorf("unable to read AC from cluster: %v", err)
 		return nil, err
 	}
 
-	for _, acr := range acrList.Items {
-		if acr.Spec.Status != v1.ReservationConfirmed {
-			return &csi.GetCapacityResponse{
-				AvailableCapacity: 0,
-				MaximumVolumeSize: &wrappers.Int64Value{},
-				MinimumVolumeSize: &wrappers.Int64Value{},
-			}, nil
-		} else {
-			for _, r := range acr.Spec.ReservationRequests {
-				availableCapacity += r.CapacityRequest.Size
-			}
+	for _, ac := range acList.Items {
+		if ac.Spec.NodeId == req.AccessibleTopology.Segments["nodes.csi-baremetal.dell.com/uuid"] {
+			availableCapacity += ac.Spec.Size
 		}
 	} 
 
