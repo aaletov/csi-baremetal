@@ -323,6 +323,18 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 	})
 	ll.Infof("Processing request: %v", req)
 
+	if req.GetVolumeCapabilities() == nil || len(req.GetVolumeCapabilities()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume capabilities missing in request")
+	}
+
+	if len(req.GetParameters()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Parameters missing in request")
+	}
+
+	if req.GetAccessibilityRequirements() == nil {
+		return nil, status.Error(codes.InvalidArgument, "AccessibiltyRequirements missing in request")
+	}
+
 	var (
 		availableCapacity int64
 	)
@@ -335,7 +347,7 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 	}
 
 	for _, ac := range acList.Items {
-		if ac.Spec.NodeId == req.AccessibleTopology.Segments["nodes.csi-baremetal.dell.com/uuid"] {
+		if checkAccessibilityRequirements(ac, req) && checkStorageClass(ac, req) {
 			availableCapacity += ac.Spec.Size
 		}
 	} 
@@ -347,6 +359,15 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 		},
 		MinimumVolumeSize: &wrappers.Int64Value{},
 	}, nil
+}
+
+func checkAccessibilityRequirements(ac AvailableCapacity, req *csi.GetCapacityRequest) {
+	return ac.Spec.NodeId == req.GetAccessibilityRequirements().Segments[csibmnodeconst.NodeIDTopologyLabelKey]
+}
+
+func checkStorageClass(ac AvailableCapacity, req *csi.GetCapacityRequest) {
+	return (apiV1.StorageClassAny == req.Parameters[base.StorageTypeKey])
+		|| (ac.Spec.StorageClass == req.Parameters[base.StorageTypeKey])
 }
 
 // ControllerGetCapabilities is the implementation of CSI Spec ControllerGetCapabilities.
