@@ -331,7 +331,7 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 		return nil, status.Error(codes.InvalidArgument, "Parameters missing in request")
 	}
 
-	if req.GetAccessibilityRequirements() == nil {
+	if req.GetAccessibleTopology() == nil {
 		return nil, status.Error(codes.InvalidArgument, "AccessibiltyRequirements missing in request")
 	}
 
@@ -348,7 +348,7 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 	}
 
 	for _, ac := range acList.Items {
-		if checkAccessibilityRequirements(ac, req) && checkStorageClass(ac, req) {
+		if checkAccessibleTopology(ac, req) && checkStorageClass(ac, req) {
 			availableCapacity += ac.Spec.Size
 			if ac.Spec.Size > maxVolumeSize {
 				maxVolumeSize = ac.Spec.Size
@@ -365,13 +365,13 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 	}, nil
 }
 
-func checkAccessibilityRequirements(ac AvailableCapacity, req *csi.GetCapacityRequest) {
-	return ac.Spec.NodeId == req.GetAccessibilityRequirements().Segments[csibmnodeconst.NodeIDTopologyLabelKey]
+func checkAccessibleTopology(ac accrd.AvailableCapacity, req *csi.GetCapacityRequest) bool {
+	return ac.Spec.NodeId == req.GetAccessibleTopology().Segments[csibmnodeconst.NodeIDTopologyLabelKey]
 }
 
-func checkStorageClass(ac AvailableCapacity, req *csi.GetCapacityRequest) {
-	return (apiV1.StorageClassAny == req.Parameters[base.StorageTypeKey])
-		|| (ac.Spec.StorageClass == req.Parameters[base.StorageTypeKey])
+func checkStorageClass(ac accrd.AvailableCapacity, req *csi.GetCapacityRequest) bool {
+	return (apiV1.StorageClassAny == req.Parameters[base.StorageTypeKey]) || 
+		(ac.Spec.StorageClass == req.Parameters[base.StorageTypeKey])
 }
 
 // ControllerGetCapabilities is the implementation of CSI Spec ControllerGetCapabilities.
