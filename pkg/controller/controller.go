@@ -337,6 +337,7 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 
 	var (
 		availableCapacity int64
+		maxVolumeSize int64
 	)
 
 	acList := &accrd.AvailableCapacityList{}
@@ -349,13 +350,16 @@ func (c *CSIControllerService) GetCapacity(ctx context.Context, req *csi.GetCapa
 	for _, ac := range acList.Items {
 		if checkAccessibilityRequirements(ac, req) && checkStorageClass(ac, req) {
 			availableCapacity += ac.Spec.Size
+			if ac.Spec.Size > maxVolumeSize {
+				maxVolumeSize = ac.Spec.Size
+			}
 		}
 	} 
 
 	return &csi.GetCapacityResponse{
 		AvailableCapacity: availableCapacity,
 		MaximumVolumeSize: &wrappers.Int64Value{
-			Value: availableCapacity,
+			Value: maxVolumeSize,
 		},
 		MinimumVolumeSize: &wrappers.Int64Value{},
 	}, nil
