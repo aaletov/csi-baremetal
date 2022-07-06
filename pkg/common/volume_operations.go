@@ -148,33 +148,52 @@ func (vo *VolumeOperationsImpl) CreateVolume(ctx context.Context, v api.Volume) 
 
 func (vo *VolumeOperationsImpl) handleVolumeCreation(ctx context.Context, log *logrus.Entry, v api.Volume,
 	podNamespace string, reservationName string) (*api.Volume, error) {
+	var err error
 	// read volume reservation
-	podReservation, volumeReservationNum, err := vo.getVolumeReservation(ctx, log, podNamespace, reservationName)
-	if err != nil {
-		return nil, err
-	}
+	//podReservation, volumeReservationNum, err := vo.getVolumeReservation(ctx, log, podNamespace, reservationName)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	var (
 		isFound           = false
 		ac                = &accrd.AvailableCapacity{}
-		volumeReservation = podReservation.Spec.ReservationRequests[volumeReservationNum]
+		//volumeReservation = podReservation.Spec.ReservationRequests[volumeReservationNum]
 		claimLabels       map[string]string
 	)
-	// scheduler extender reserves capacity on different nodes during filter stage since 'reserve' API is not available
-	// need to find capacity on requested node
-	for _, capacityName := range volumeReservation.Reservations {
-		// read available capacity
-		err = vo.k8sClient.ReadCR(ctx, capacityName, "", ac)
-		if err != nil {
-			log.Errorf("Failed to read capacity %s: %v", capacityName, err)
-			return nil, err
-		}
-		// break when found
-		if ac.Spec.NodeId == v.NodeId {
-			isFound = true
-			break
-		}
+	// // scheduler extender reserves capacity on different nodes during filter stage since 'reserve' API is not available
+	// // need to find capacity on requested node
+	// for _, capacityName := range volumeReservation.Reservations {
+	// 	// read available capacity
+	// 	err = vo.k8sClient.ReadCR(ctx, capacityName, "", ac)
+	// 	if err != nil {
+	// 		log.Errorf("Failed to read capacity %s: %v", capacityName, err)
+	// 		return nil, err
+	// 	}
+	// 	// break when found
+	// 	if ac.Spec.NodeId == v.NodeId {
+	// 		isFound = true
+	// 		break
+	// 	}
+	// }
+
+	acList := &accrd.AvailableCapacityList{}
+
+	if err = vo.k8sClient.ReadList(ctx, acList); err != nil {
+		return nil, status.Error(codes.ResourceExhausted,
+			"can't read AC from cluster")
 	}
+
+	for _, *ac = range acList.Items {
+		// Need to handle LVG SC somehow
+		if (ac.Spec.NodeId == v.NodeId) && ((ac.Spec.StorageClass == v.StorageClass) || (v.StorageClass == apiV1.StorageClassAny)) {
+			if v.Size <= ac.Spec.Size {
+				isFound = true
+				break
+			}
+		}
+	} 
+
 	// capacity must be found when reservation exists
 	if !isFound {
 		return nil, status.Error(codes.ResourceExhausted,
@@ -243,10 +262,10 @@ func (vo *VolumeOperationsImpl) handleVolumeCreation(ctx context.Context, log *l
 	if err = vo.k8sClient.UpdateCRWithAttempts(ctx, ac, 5); err != nil {
 		log.Errorf("Unable to set size for AC %s to %d, error: %v", ac.Name, ac.Spec.Size, err)
 	}
-	// release reservation
-	if err := vo.deleteVolumeReservation(ctx, podReservation, volumeReservationNum); err != nil {
-		return nil, err
-	}
+	// // release reservation
+	// if err := vo.deleteVolumeReservation(ctx, podReservation, volumeReservationNum); err != nil {
+	// 	return nil, err
+	// }
 
 	return &volumeCR.Spec, nil
 }
@@ -255,12 +274,12 @@ func (vo *VolumeOperationsImpl) handleVolumeInProgress(ctx context.Context, log 
 	podNamespace string, reservationName string) (*api.Volume, error) {
 	log.Infof("Volume exists, current status: %s.", volumeCR.Spec.CSIStatus)
 	// release reservation if it was requested by scheduler again
-	if reservation, number, err := vo.getVolumeReservation(ctx, log, podNamespace, reservationName); err == nil {
-		err = vo.deleteVolumeReservation(ctx, reservation, number)
-		if err != nil {
-			log.Errorf("Unable to release volume reservation %v", err)
-		}
-	}
+	// if reservation, number, err := vo.getVolumeReservation(ctx, log, podNamespace, reservationName); err == nil {
+	// 	err = vo.deleteVolumeReservation(ctx, reservation, number)
+	// 	if err != nil {
+	// 		log.Errorf("Unable to release volume reservation %v", err)
+	// 	}
+	// }
 
 	switch volumeCR.Spec.CSIStatus {
 	// return error if Failed
