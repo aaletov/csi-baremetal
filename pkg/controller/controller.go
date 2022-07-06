@@ -183,12 +183,6 @@ func (c *CSIControllerService) CreateVolume(ctx context.Context, req *csi.Create
 		ctxValue = context.WithValue(ctx, util.VolumeInfoKey, volumeInfo)
 	)
 
-	if len(req.GetVolumeCapabilities()) == 0 {
-		err = fmt.Errorf("volume capabilities are empty: %+v", req.GetVolumeCapabilities())
-		ll.Errorf("Failed to create volume: %v", err)
-		return nil, err
-	}
-
 	// Map Volume type from request
 	// VolumeCapability_Mount -> ModeFS
 	// VolumeCapability_Block -> ModeRAW
